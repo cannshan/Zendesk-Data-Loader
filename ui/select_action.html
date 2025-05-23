@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Action - Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="action-selection">
+    <div class="container">
+        <h2 class="text-center">Select Action</h2>
+        <div class="action-buttons">
+            <button class="primary-button" onclick="selectAction('import')">Import</button>
+            <button class="primary-button" onclick="selectAction('update')">Update</button>
+            <button class="primary-button" onclick="selectAction('delete')">Delete</button>
+            <button class="primary-button" onclick="selectAction('export')">Export</button>
+        </div>
+        <div class="field-mapping-nav-horizontal">
+            <button class="nav-button" onclick="goBack()">Back</button>
+            <button class="nav-button primary-button" onclick="nextPage()">Next</button>
+        </div>
+    </div>
+
+    <script>
+        // Ensure pywebview is initialized before making API calls
+        window.addEventListener('pywebviewready', async () => {
+            try {
+                console.log('pywebviewready event triggered');
+                // Perform any initialization if needed
+                // For example, check if an action is already selected
+                const actionResponse = await window.pywebview.api.get_action_type();
+                if (actionResponse.action_type && actionResponse.action_type !== "Not Selected") {
+                    console.log(`Action already selected: ${actionResponse.action_type}`);
+                    // Optionally highlight the selected action button
+                }
+            } catch (error) {
+                console.error('Error initializing pywebview:', error);
+                alert('Error initializing page: ' + error);
+            }
+        });
+
+        // Select an action and set it in the backend
+        async function selectAction(action) {
+            try {
+                console.log(`Selecting action: ${action}`);
+                const response = await window.pywebview.api.set_action_type(action);
+                if (response.success) {
+                    nextPage();
+                } else {
+                    alert('Failed to set action type: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error setting action type:', error);
+                alert('Error setting action type: ' + error);
+            }
+        }
+
+        // Navigate to the next page
+        async function nextPage() {
+            try {
+                console.log('Navigating to object_selection');
+                await window.pywebview.api.navigate_to('object_selection');
+            } catch (error) {
+                console.error('Error navigating to object_selection:', error);
+                alert('Error navigating: ' + error);
+            }
+        }
+
+        // Navigate back to the login page
+        function goBack() {
+            try {
+                console.log('Navigating to login');
+                window.pywebview.api.navigate_to('login');
+            } catch (error) {
+                console.error('Error navigating to login:', error);
+                alert('Error navigating: ' + error);
+            }
+        }
+
+        // Close dropdowns when clicking outside (consistent with other pages)
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.custom-dropdown')) {
+                document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="login">
+    <div class="container">
+        <div class="logo-section">
+            <h1 class="app-title">Zendesk Data Loader</h1>
+        </div>
+        <div class="login-form">
+            <div class="form-group">
+                <label for="subdomain">Subdomain</label>
+                <input type="text" id="subdomain" placeholder="e.g., yourcompany" required>
+                
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="e.g., user@yourcompany.com" required>
+                
+                <label for="api_token">API Token</label>
+                <input type="password" id="api_token" placeholder="Enter your API token" required>
+                
+                <div class="checkbox-group">
+                    <input type="checkbox" id="save_credentials">
+                    <label for="save_credentials">Remember me</label>
+                </div>
+            </div>
+            <div class="button-group">
+                <button onclick="authenticateUser()" class="login-button">Sign In</button>
+            </div>
+        </div>
+        <p class="footer-text">Need assistance? <a href="https://support.zendesk.com" target="_blank">Contact Zendesk Support</a></p>
+    </div>
+
+    <script>
+        function authenticateUser() {
+            const subdomain = document.getElementById('subdomain').value;
+            const email = document.getElementById('email').value;
+            const apiToken = document.getElementById('api_token').value;
+            const saveCredentials = document.getElementById('save_credentials').checked;
+
+            window.pywebview.api.authenticate({
+                subdomain: subdomain,
+                email: email,
+                api_token: apiToken,
+                save_credentials: saveCredentials
+            }).then(response => {
+                if (response.success) {
+                    alert("Login Successful");
+                    window.pywebview.api.navigate_to('action_selection');
+                } else {
+                    alert("Login Failed: " + response.message);
+                }
+            });
+        }
+
+        function loadSavedCredentials() {
+            console.log("Fetching saved credentials...");
+            window.pywebview.api.load_credentials().then(credentials => {
+                console.log("Received credentials from backend:", credentials);
+                if (credentials && credentials.subdomain) {
+                    document.getElementById('subdomain').value = credentials.subdomain;
+                    document.getElementById('email').value = credentials.email;
+                    document.getElementById('api_token').value = credentials.api_token;
+                    document.getElementById('save_credentials').checked = true;
+                }
+            }).catch(error => {
+                console.error("Failed to load credentials:", error);
+            });
+        }
+
+        window.addEventListener('pywebviewready', loadSavedCredentials);
+    </script>
+    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'92ff213dee7be8e4',t:'MTc0NDU5MDk5Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>

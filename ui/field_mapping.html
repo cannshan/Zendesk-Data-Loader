@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Mapping - Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="field-mapping">
+    <div class="container">
+        <h2 id="dynamic-heading" class="text-center">Field Mapping</h2>
+
+        <!-- Tabs for different mapping sections -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('ticket')">Ticket Mapping</button>
+            <button class="tab-button" onclick="switchTab('comment')" id="comment-tab" style="display: none;">Comment Mapping</button>
+            <button class="tab-button" onclick="switchTab('attachment')" id="attachment-tab" style="display: none;">Attachment Mapping</button>
+        </div>
+
+        <!-- Ticket Mapping Section -->
+        <div id="ticket-mapping-section" class="tab-content active">
+            <div class="upload-section">
+                <button id="choose-ticket-csv" class="secondary-button" onclick="loadCsv()">Choose Ticket CSV</button>
+            </div>
+            <div class="mapping-header">
+                <div class="button-group">
+                    <button class="secondary-button" onclick="autoMapFields('ticket')">🔄 Auto-Map Fields</button>
+                    <button class="secondary-button" onclick="saveMapping('ticket')">💾 Save Mapping</button>
+                    <button class="secondary-button" onclick="loadMapping('ticket')">📂 Load Mapping</button>
+                </div>
+            </div>
+            <div id="ticket_mapping_container" class="mapping-list"></div>
+        </div>
+
+        <!-- Comment Mapping Section -->
+        <div id="comment-mapping-section" class="tab-content" style="display: none;">
+            <div class="upload-section">
+                <button class="secondary-button" onclick="loadCommentsCsv()">Choose Comment CSV</button>
+            </div>
+            <div class="mapping-header">
+                <div class="button-group">
+                    <button class="secondary-button" onclick="autoMapFields('comment')">🔄 Auto-Map Fields</button>
+                    <button class="secondary-button" onclick="saveMapping('comment')">💾 Save Mapping</button>
+                    <button class="secondary-button" onclick="loadMapping('comment')">📂 Load Mapping</button>
+                </div>
+            </div>
+            <div id="comment_mapping_container" class="mapping-list"></div>
+        </div>
+
+        <!-- Attachment Mapping Section -->
+        <div id="attachment-mapping-section" class="tab-content" style="display: none;">
+            <div class="upload-section">
+                <button class="secondary-button" onclick="loadAttachmentsCsv()">Choose Attachment CSV</button>
+            </div>
+            <div class="mapping-header">
+                <div class="button-group">
+                    <button class="secondary-button" onclick="autoMapFields('attachment')">🔄 Auto-Map Fields</button>
+                    <button class="secondary-button" onclick="saveMapping('attachment')">💾 Save Mapping</button>
+                    <button class="secondary-button" onclick="loadMapping('attachment')">📂 Load Mapping</button>
+                </div>
+            </div>
+            <div id="attachment_mapping_container" class="mapping-list"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="field-mapping-nav-horizontal">
+            <button class="nav-button" onclick="goBack()">Back</button>
+            <button class="nav-button primary-button" onclick="nextPage()">Next</button>
+        </div>
+    </div>
+
+    <script>
+        let csvHeaders = [];
+        let commentsCsvHeaders = [];
+        let attachmentsCsvHeaders = [];
+        let ticketZendeskFields = [];
+        let commentZendeskFields = ['author_id', 'body', 'html_body', 'public', 'created_at'];
+        let attachmentZendeskFields = [{ api_name: 'file_name', display_name: 'File Name', type: 'text' }];
+        let fieldMapping = {};
+        let commentFieldMapping = {};
+        let attachmentFieldMapping = {};
+        let isTicketsAndComments = false;
+        let isTicketsCommentsAttachments = false;
+        let selectedObject = '';
+        let actionType = '';
+        let isCustomObject = false;
+
+        // Helper function to convert a string to title case
+        function toTitleCase(str) {
+            return str
+                .toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        // Add updateFieldMapping to handle backend mapping updates
+        window.updateFieldMapping = function(mapping, type) {
+            console.log(`updateFieldMapping called with type: ${type}, mapping:`, mapping);
+            if (type === 'ticket') {
+                fieldMapping = mapping || fieldMapping;
+                populateMapping('ticket');
+            } else if (type === 'comment') {
+                commentFieldMapping = mapping || commentFieldMapping;
+                populateMapping('comment');
+            } else if (type === 'attachment') {
+                attachmentFieldMapping = mapping || attachmentFieldMapping;
+                populateMapping('attachment');
+            }
+            return true; // Indicate success
+        };
+
+        window.addEventListener('pywebviewready', async () => {
+            try {
+                const selectedObjectResponse = await window.pywebview.api.get_selected_object();
+                const actionResponse = await window.pywebview.api.get_action_type();
+                selectedObject = selectedObjectResponse.selected_object;
+                actionType = actionResponse.action_type;
+
+                // Determine if the selected object is a custom object
+                const builtinObjects = ['Users', 'Agent', 'Organizations', 'Tickets', 'Ticket Comments', 'Attachments'];
+                isCustomObject = !builtinObjects.includes(selectedObject);
+
+                // Update button text based on selected object
+                const chooseCsvButton = document.getElementById('choose-ticket-csv');
+                let buttonText = 'Choose CSV'; // Default fallback
+                if (selectedObject === 'Tickets' || selectedObject === 'Tickets + Comments' || selectedObject === 'Tickets + Comments + Attachments') {
+                    buttonText = 'Choose Ticket CSV';
+                } else if (selectedObject === 'Organizations') {
+                    buttonText = 'Choose Organization CSV';
+                } else if (selectedObject === 'Users') {
+                    buttonText = 'Choose User CSV';
+                } else if (selectedObject === 'Agent' || selectedObject === 'Agents') {
+                    buttonText = 'Choose Agent CSV';
+                } else if (selectedObject === 'Attachments') {
+                    buttonText = 'Choose Attachment CSV';
+                } else {
+                    // For custom objects, use the object name
+                    buttonText = `Choose ${selectedObject} CSV`;
+                }
+                chooseCsvButton.textContent = buttonText;
+
+                const objectDisplayName = selectedObject === "Tickets + Comments" || selectedObject === "Tickets + Comments + Attachments" ? "Tickets" : selectedObject;
+                const heading = document.getElementById('dynamic-heading');
+                heading.textContent = `${actionType.charAt(0).toUpperCase() + actionType.slice(1)} ${objectDisplayName} Mapping`;
+
+                isTicketsAndComments = selectedObject === "Tickets + Comments";
+                isTicketsCommentsAttachments = selectedObject === "Tickets + Comments + Attachments";
+
+                // Show/hide tabs based on selected object
+                if (!isTicketsAndComments && !isTicketsCommentsAttachments) {
+                    document.querySelector('.tab-button[onclick="switchTab(\'ticket\')"]').style.display = 'none';
+                    document.getElementById('ticket-mapping-section').style.display = 'block';
+                } else {
+                    document.getElementById('comment-tab').style.display = 'block';
+                    document.getElementById('comment-mapping-section').style.display = 'none';
+                    if (isTicketsCommentsAttachments) {
+                        document.getElementById('attachment-tab').style.display = 'block';
+                        document.getElementById('attachment-mapping-section').style.display = 'none';
+                    }
+                }
+
+                const response = await window.pywebview.api.get_zendesk_fields(selectedObject);
+                if (response.success) {
+                    ticketZendeskFields = response.fields;
+                    const csvData = await window.pywebview.api.get_csv_data();
+                    if (csvData.headers && csvData.headers.length > 0) {
+                        csvHeaders = csvData.headers;
+                        const ticketMapping = await window.pywebview.api.get_field_mapping('ticket');
+                        if (ticketMapping.success) {
+                            fieldMapping = ticketMapping.mapping;
+                        }
+                        populateMapping('ticket');
+                    }
+                    if (csvData.comments_headers && csvData.comments_headers.length > 0) {
+                        commentsCsvHeaders = csvData.comments_headers;
+                        const commentMapping = await window.pywebview.api.get_field_mapping('comment');
+                        if (commentMapping.success) {
+                            commentFieldMapping = commentMapping.mapping;
+                        }
+                        populateMapping('comment');
+                    }
+                    if (csvData.attachments_headers && csvData.attachments_headers.length > 0) {
+                        attachmentsCsvHeaders = csvData.attachments_headers;
+                        const attachmentMapping = await window.pywebview.api.get_field_mapping('attachment');
+                        if (attachmentMapping.success) {
+                            attachmentFieldMapping = attachmentMapping.mapping;
+                        }
+                        populateMapping('attachment');
+                    }
+                } else {
+                    alert('Failed to fetch Zendesk fields: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error initializing page:', error);
+                alert('Error initializing page: ' + error);
+            }
+        });
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+            document.querySelector(`.tab-button[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}-mapping-section`).style.display = 'block';
+            populateMapping(tab);
+        }
+
+        async function loadCsv() {
+            try {
+                const fileResponse = await window.pywebview.api.select_csv_file();
+                if (!fileResponse.success) {
+                    console.log('No file selected for ticket CSV:', fileResponse.message);
+                    alert('No file selected: ' + fileResponse.message);
+                    return;
+                }
+
+                const filePath = fileResponse.file_path;
+                console.log('Selected file path:', filePath);
+
+                // Send file path to backend with headers_only flag
+                const response = await window.pywebview.api.load_csv({ filePath, headers_only: true });
+                console.log('Backend response:', response);
+                if (response.success) {
+                    csvHeaders = response.fields;
+                    populateMapping('ticket');
+                } else {
+                    console.log('Failed to load ticket CSV headers:', response.message);
+                    alert('Failed to load CSV headers: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error loading ticket CSV headers:', error);
+                alert('Error loading CSV headers: ' + error.message);
+            }
+        }
+
+        async function loadCommentsCsv() {
+            try {
+                const fileResponse = await window.pywebview.api.select_csv_file();
+                if (!fileResponse.success) {
+                    console.log('No file selected for comment CSV:', fileResponse.message);
+                    alert('No file selected: ' + fileResponse.message);
+                    return;
+                }
+
+                const filePath = fileResponse.file_path;
+                console.log('Selected file path:', filePath);
+
+                // Send file path to backend with headers_only flag
+                const response = await window.pywebview.api.load_comments_csv({ filePath, headers_only: true });
+                console.log('Backend response:', response);
+                if (response.success) {
+                    commentsCsvHeaders = response.fields;
+                    populateMapping('comment');
+                } else {
+                    console.log('Failed to load comment CSV headers:', response.message);
+                    alert('Failed to load comment CSV headers: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error loading comment CSV headers:', error);
+                alert('Error loading comment CSV headers: ' + error.message);
+            }
+        }
+
+        async function loadAttachmentsCsv() {
+            try {
+                const fileResponse = await window.pywebview.api.select_csv_file();
+                if (!fileResponse.success) {
+                    console.log('No file selected for attachment CSV:', fileResponse.message);
+                    alert('No file selected: ' + fileResponse.message);
+                    return;
+                }
+
+                const filePath = fileResponse.file_path;
+                console.log('Selected file path:', filePath);
+
+                // Send file path to backend with headers_only flag
+                const response = await window.pywebview.api.load_attachments_csv({ filePath, headers_only: true });
+                console.log('Backend response:', response);
+                if (response.success) {
+                    attachmentsCsvHeaders = response.fields;
+                    populateMapping('attachment');
+                } else {
+                    console.log('Failed to load attachment CSV headers:', response.message);
+                    alert('Failed to load CSV headers: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error loading attachment CSV headers:', error);
+                alert('Error loading CSV headers: ' + error.message);
+            }
+        }
+
+        function populateMapping(type) {
+            const container = document.getElementById(`${type}_mapping_container`);
+            const headers = type === 'ticket' ? csvHeaders : (type === 'comment' ? commentsCsvHeaders : attachmentsCsvHeaders);
+            let fields = type === 'ticket' ? ticketZendeskFields : 
+                        (type === 'comment' ? commentZendeskFields.map(field => ({
+                            api_name: field,
+                            display_name: toTitleCase(field.replace('_', ' ')),
+                            type: field === 'public' ? 'boolean' : (field === 'created_at' ? 'date' : 'text')
+                        })) : attachmentZendeskFields);
+            const mapping = type === 'ticket' ? fieldMapping : 
+                           (type === 'comment' ? commentFieldMapping : attachmentFieldMapping);
+
+            window.pywebview.api.get_selected_object().then(response => {
+                const selectedObject = response.selected_object;
+
+                const standardFieldNames = {
+                    'Organizations': [
+                        'id', 'external_id', 'name', 'domain_names', 'details', 'notes', 'group_id', 'tags', 'created_at'
+                    ],
+                    'Users': [
+                        'id', 'external_id', 'name', 'email', 'created_at', 'details', 'phone', 'tags', 'locale', 'organization_id'
+                    ],
+                    'Agent': [
+                        'id', 'external_id', 'name', 'email', 'created_at', 'details', 'phone', 'tags', 'locale', 'organization_id',
+                        'custom_role_id', 'ticket_restriction', 'suspended', 'signature', 'notes', 'default_group_id', 'groups', 'alias', 'agent_brand_ids'
+                    ],
+                    'Agents': [
+                        'id', 'external_id', 'name', 'email', 'created_at', 'details', 'phone', 'tags', 'locale', 'organization_id',
+                        'custom_role_id', 'ticket_restriction', 'suspended', 'signature', 'notes', 'default_group_id', 'groups', 'alias', 'agent_brand_ids'
+                    ],
+                    'Attachments': [
+                        'file_name'
+                    ]
+                };
+
+                let standardFields = [];
+                let customFields = [];
+                const isOrgOrUser = ['Organizations', 'Users', 'Agent', 'Agents'].includes(selectedObject);
+                const isCustomObject = !['Tickets', 'Tickets + Comments', 'Tickets + Comments + Attachments', 'Organizations', 'Users', 'Agent', 'Agents', 'Attachments'].includes(selectedObject);
+
+                if ((type === 'ticket' || type === 'attachment') && (isOrgOrUser || isCustomObject || selectedObject === 'Attachments')) {
+                    if (isOrgOrUser) {
+                        const normalizedStandardFields = standardFieldNames[selectedObject] || [];
+                        standardFields = fields.filter(f => normalizedStandardFields.includes(f.api_name));
+                        customFields = fields.filter(f => !normalizedStandardFields.includes(f.api_name) && f.api_name.startsWith('custom_field_'));
+
+                        normalizedStandardFields.forEach(fieldName => {
+                            if (!standardFields.some(f => f.api_name === fieldName)) {
+                                standardFields.push({
+                                    api_name: fieldName,
+                                    display_name: fieldName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                                    type: 'text'
+                                });
+                            }
+                        });
+
+                        standardFields.sort((a, b) => {
+                            const indexA = normalizedStandardFields.indexOf(a.api_name);
+                            const indexB = normalizedStandardFields.indexOf(b.api_name);
+                            return indexA - indexB;
+                        });
+
+                        console.log(`Standard fields for ${selectedObject}:`, standardFields.map(f => f.api_name));
+                        console.log(`Custom fields for ${selectedObject}:`, customFields.map(f => f.api_name));
+                    } else if (isCustomObject) {
+                        standardFields = fields.filter(f => ['name', 'external_id'].includes(f.api_name));
+                        customFields = fields.filter(f => !['name', 'external_id'].includes(f.api_name));
+                    } else if (selectedObject === 'Attachments') {
+                        standardFields = fields.filter(f => f.api_name === 'file_name');
+                        customFields = [];
+                    }
+                } else {
+                    standardFields = fields;
+                    customFields = [];
+                }
+
+                const sortedFields = [...standardFields, ...customFields];
+
+                if (!sortedFields || sortedFields.length === 0) {
+                    container.innerHTML = '<p>No fields available.</p>';
+                    return;
+                }
+
+                container.innerHTML = "";
+                headers.forEach(header => {
+                    const div = document.createElement("div");
+                    div.className = "mapping-row";
+                    const currentValue = mapping[header] || '';
+                    const selectedField = sortedFields.find(f => f.api_name === currentValue) || { api_name: '', display_name: '' };
+                    const displayText = currentValue ? selectedField.display_name : '';
+
+                    const isMapped = currentValue && sortedFields.some(f => f.api_name === currentValue);
+
+                    div.innerHTML = `
+                        <div class="mapping-content">
+                            <label class="csv-header-label">${header}</label>
+                            <div class="custom-dropdown" id="${type}_${header}_dropdown">
+                                <div class="dropdown-trigger" tabindex="0" onclick="toggleDropdown('${type}', '${header}')">
+                                    <span class="dropdown-text">${displayText || ''}</span>
+                                </div>
+                                <div class="dropdown-list">
+                                    <input type="text" class="dropdown-search" placeholder="Search fields..." oninput="filterDropdown('${type}', '${header}', this.value)">
+                                    <div class="dropdown-header">
+                                        <span class="dropdown-column field-name">Display Name</span>
+                                        <span class="dropdown-column api-name">${type === 'ticket' || type ===  type === 'attachment' ? 'Field ID' : 'Field Key'}</span>
+                                        <span class="dropdown-column data-type">Field Type</span>
+                                    </div>
+                                    <div class="dropdown-options">
+                                        <div class="dropdown-option" onclick="selectField('${type}', '${header}', '')">(None)</div>
+                                        ${sortedFields.map(field => {
+                                            const isRequiredField = selectedObject === 'Agent' ? ['name', 'email'].includes(field.api_name) :
+                                                                    (['Organizations', 'Users'].includes(selectedObject) || isCustomObject) ? field.api_name === 'name' :
+                                                                    (selectedObject === 'Tickets' || selectedObject === 'Tickets + Comments' || selectedObject === 'Tickets + Comments + Attachments') ? field.api_name === 'subject' :
+                                                                    selectedObject === 'Attachments' ? field.api_name === 'file_name' : false;
+                                            return `
+                                                <div class="dropdown-option" onclick="selectField('${type}', '${header}', '${field.api_name}')" data-api="${field.api_name}" data-type="${field.type}">
+                                                    <span class="dropdown-column field-name">${field.display_name}${isRequiredField ? '<span class="required">*</span>' : ''}</span>
+                                                    <span class="dropdown-column api-name">${field.api_name}</span>
+                                                    <span class="dropdown-column data-type">${field.type}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="mapping-status-icon">${isMapped ? '✅' : ''}</span>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            });
+        }
+
+        function toggleDropdown(type, header) {
+            const dropdown = document.getElementById(`${type}_${header}_dropdown`);
+            const isOpen = dropdown.classList.contains('open');
+            document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
+
+            if (!isOpen) {
+                dropdown.classList.add('open');
+                const dropdownTrigger = dropdown.querySelector('.dropdown-trigger');
+                const dropdownList = dropdown.querySelector('.dropdown-list');
+
+                dropdownList.style.top = 'auto';
+                dropdownList.style.bottom = 'auto';
+
+                const triggerRect = dropdownTrigger.getBoundingClientRect();
+                const listHeight = dropdownList.offsetHeight;
+                const viewportHeight = window.innerHeight;
+                const spaceBelow = viewportHeight - triggerRect.bottom;
+                const spaceAbove = triggerRect.top;
+
+                if (spaceBelow >= listHeight || spaceBelow >= spaceAbove) {
+                    dropdownList.style.top = '100%';
+                    dropdownList.style.bottom = 'auto';
+                } else {
+                    dropdownList.style.top = 'auto';
+                    dropdownList.style.bottom = '100%';
+                }
+
+                setTimeout(() => {
+                    const firstFewRows = dropdownList.querySelectorAll('.dropdown-option')[2];
+                    if (firstFewRows) {
+                        firstFewRows.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }, 0);
+            }
+        }
+
+        function filterDropdown(type, header, searchTerm) {
+            const dropdown = document.getElementById(`${type}_${header}_dropdown`);
+            const options = dropdown.querySelectorAll('.dropdown-option');
+            let fields = (type === 'ticket' || type === 'attachment') ? ticketZendeskFields : 
+                        commentZendeskFields.map(field => ({
+                            api_name: field,
+                            display_name: toTitleCase(field.replace('_', ' ')),
+                            type: field === 'public' ? 'boolean' : (field === 'created_at' ? 'date' : 'text')
+                        }));
+
+            options.forEach(option => {
+                const apiName = option.getAttribute('data-api') || '';
+                let shouldShow = false;
+
+                if (!apiName) {
+                    shouldShow = "(none)".includes(searchTerm.toLowerCase());
+                } else {
+                    const field = fields.find(f => f.api_name === apiName);
+                    if (field) {
+                        const text = `${field.display_name} ${field.api_name} ${field.type}`.toLowerCase();
+                        shouldShow = text.includes(searchTerm.toLowerCase());
+                    }
+                }
+
+                option.style.display = shouldShow ? 'block' : 'none';
+            });
+        }
+
+        function selectField(type, header, apiName) {
+            if (type === 'ticket') {
+                fieldMapping[header] = apiName;
+            } else if (type === 'comment') {
+                commentFieldMapping[header] = apiName;
+            } else if (type === 'attachment') {
+                attachmentFieldMapping[header] = apiName;
+            }
+            populateMapping(type);
+        }
+
+        async function autoMapFields(type) {
+            const headers = type === 'ticket' ? csvHeaders : (type === 'comment' ? commentsCsvHeaders : attachmentsCsvHeaders);
+            const response = await window.pywebview.api.auto_map_fields(headers, type);
+            if (response.success) {
+                if (type === 'ticket') {
+                    fieldMapping = response.mapping;
+                } else if (type === 'comment') {
+                    commentFieldMapping = response.mapping;
+                } else if (type === 'attachment') {
+                    attachmentFieldMapping = response.mapping;
+                }
+                populateMapping(type);
+            } else {
+                alert('Failed to auto-map fields: ' + response.message);
+            }
+        }
+
+        async function saveMapping(type) {
+            const mapping = type === 'ticket' ? fieldMapping : (type === 'comment' ? commentFieldMapping : attachmentFieldMapping);
+            const fileResponse = await window.pywebview.api.select_save_file(`${type}_mapping.json`);
+            if (fileResponse.success) {
+                const saveResponse = await window.pywebview.api.save_mapping_to_file(mapping, fileResponse.file_path, type);
+                if (saveResponse.success) alert('Mapping saved!');
+                else alert('Failed to save mapping: ' + saveResponse.message);
+            } else {
+                alert('Failed to select file: ' + fileResponse.message);
+            }
+        }
+
+        async function loadMapping(type) {
+            const fileResponse = await window.pywebview.api.select_mapping_file();
+            if (fileResponse.success) {
+                const loadResponse = await window.pywebview.api.load_mapping_from_file(fileResponse.file_path, type);
+                if (loadResponse.success) {
+                    if (type === 'ticket') {
+                        fieldMapping = loadResponse.mapping;
+                    } else if (type === 'comment') {
+                        commentFieldMapping = loadResponse.mapping;
+                    } else if (type === 'attachment') {
+                        attachmentFieldMapping = loadResponse.mapping;
+                    }
+                    populateMapping(type);
+                    alert('Mapping loaded!');
+                } else {
+                    alert('Failed to load mapping: ' + loadResponse.message);
+                }
+            }
+        }
+
+        async function nextPage() {
+            try {
+                // Save field mappings
+                const ticketResponse = await window.pywebview.api.set_field_mapping(fieldMapping, 'ticket');
+                if (!ticketResponse.success) {
+                    alert('Failed to save ticket mappings: ' + ticketResponse.message);
+                    return;
+                }
+
+                if (isTicketsAndComments || isTicketsCommentsAttachments) {
+                    const commentResponse = await window.pywebview.api.set_field_mapping(commentFieldMapping, 'comment');
+                    if (!commentResponse.success) {
+                        alert('Failed to save comment mappings: ' + commentResponse.message);
+                        return;
+                    }
+
+                    if (isTicketsCommentsAttachments) {
+                        const attachmentResponse = await window.pywebview.api.set_field_mapping(attachmentFieldMapping, 'attachment');
+                        if (!attachmentResponse.success) {
+                            alert('Failed to save attachment mappings: ' + attachmentResponse.message);
+                            return;
+                        }
+                    }
+                }
+
+                // Navigate to the next page
+                window.pywebview.api.navigate_to('confirm_import');
+            } catch (error) {
+                console.error('Error saving mappings:', error);
+                alert('Error saving mappings: ' + error.message);
+            }
+        }
+
+        function goBack() {
+            window.pywebview.api.navigate_to('object_selection');
+        }
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.custom-dropdown')) {
+                document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comment Field Mapping - Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="comment-field-mapping">
+    <div class="container">
+        <h2 id="dynamic-heading" class="text-center">Comment Mapping</h2>
+
+        <!-- Comment Mapping Section -->
+        <div id="comment-mapping-section" class="tab-content active">
+            <div class="upload-section">
+                <input type="file" id="comment_csv_upload" accept=".csv" onchange="loadCommentsCsv()">
+            </div>
+            <div class="mapping-header">
+                <div class="button-group">
+                    <button class="secondary-button" onclick="autoMapFields('comment')">🔄 Auto-Map Fields</button>
+                    <button class="secondary-button" onclick="saveMapping('comment')">💾 Save Mapping</button>
+                    <button class="secondary-button" onclick="loadMapping('comment')">📂 Load Mapping</button>
+                </div>
+            </div>
+            <div id="comment_mapping_container" class="mapping-list"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="field-mapping-nav-horizontal">
+            <button class="nav-button" onclick="goBack()">Back</button>
+            <button class="nav-button primary-button" onclick="nextPage()">Next</button>
+        </div>
+    </div>
+
+    <script>
+        let commentsCsvHeaders = [];
+        let commentZendeskFields = ['author_id', 'body', 'html_body', 'public', 'created_at'];
+        let commentFieldMapping = {};
+
+        // Add updateFieldMapping to handle backend mapping updates
+        window.updateFieldMapping = function(mapping, type) {
+            console.log(`updateFieldMapping called with type: ${type}, mapping:`, mapping);
+            if (type === 'comment') {
+                commentFieldMapping = mapping || commentFieldMapping;
+                populateMapping('comment');
+            }
+            return true; // Indicate success
+        };
+
+        window.addEventListener('pywebviewready', async () => {
+            try {
+                const selectedObjectResponse = await window.pywebview.api.get_selected_object();
+                const actionResponse = await window.pywebview.api.get_action_type();
+                const selectedObject = selectedObjectResponse.selected_object;
+                const actionType = actionResponse.action_type;
+
+                // Update dynamic heading
+                const heading = document.getElementById('dynamic-heading');
+                const capitalizedAction = actionType.charAt(0).toUpperCase() + actionType.slice(1);
+                heading.textContent = `${capitalizedAction} Comment Mapping`;
+
+                const csvData = await window.pywebview.api.get_csv_data();
+                if (csvData.comments_headers && csvData.comments_headers.length > 0) {
+                    commentsCsvHeaders = csvData.comments_headers;
+                    const commentMapping = await window.pywebview.api.get_field_mapping('comment');
+                    if (commentMapping.success) {
+                        commentFieldMapping = commentMapping.mapping;
+                    }
+                    populateMapping('comment');
+                }
+            } catch (error) {
+                console.error('Error initializing page:', error);
+                alert('Error initializing page: ' + error);
+            }
+        });
+
+        async function loadCommentsCsv() {
+            const fileInput = document.getElementById('comment_csv_upload');
+            const file = fileInput.files[0];
+            if (!file) {
+                console.log('No file selected for comment CSV');
+                return;
+            }
+
+            const filePath = file.path || file.name;
+            console.log('Selected file path:', filePath);
+
+            try {
+                // Send file path to backend with headers_only flag
+                const response = await window.pywebview.api.load_comments_csv({ filePath, headers_only: true });
+                console.log('Backend response:', response);
+                if (response.success) {
+                    commentsCsvHeaders = response.fields;
+                    populateMapping('comment');
+                } else {
+                    console.log('Failed to load comment CSV headers:', response.message);
+                    alert('Failed to load comment CSV headers: ' + response.message);
+                }
+            } catch (error) {
+                console.error('Error loading comment CSV headers:', error);
+                alert('Error loading comment CSV headers: ' + error.message);
+            }
+        }
+
+        function populateMapping(type) {
+            const container = document.getElementById(`${type}_mapping_container`);
+            const headers = commentsCsvHeaders;
+            const fields = commentZendeskFields.map(field => ({
+                api_name: field,
+                display_name: field.replace('_', ' ').title(),
+                type: field === 'public' ? 'boolean' : (field === 'created_at' ? 'date' : 'text')
+            }));
+
+            container.innerHTML = "";
+            headers.forEach(header => {
+                const div = document.createElement("div");
+                div.className = "mapping-row";
+                const currentValue = commentFieldMapping[header] || '';
+                const selectedField = fields.find(f => f.api_name === currentValue) || { api_name: '', display_name: '' };
+                const displayText = currentValue ? selectedField.display_name : '';
+
+                const isMapped = currentValue && fields.some(f => f.api_name === currentValue);
+
+                div.innerHTML = `
+                    <div class="mapping-content">
+                        <label class="csv-header-label">${header}</label>
+                        <div class="custom-dropdown" id="${type}_${header}_dropdown">
+                            <div class="dropdown-trigger" tabindex="0" onclick="toggleDropdown('${type}', '${header}')">
+                                <span class="dropdown-text">${displayText || ''}</span>
+                            </div>
+                            <div class="dropdown-list">
+                                <input type="text" class="dropdown-search" placeholder="Search fields..." oninput="filterDropdown('${type}', '${header}', this.value)">
+                                <div class="dropdown-header">
+                                    <span class="dropdown-column field-name">Display Name</span>
+                                    <span class="dropdown-column api-name">Field ID</span>
+                                    <span class="dropdown-column data-type">Field Type</span>
+                                </div>
+                                <div class="dropdown-options">
+                                    <div class="dropdown-option" onclick="selectField('${type}', '${header}', '')">(None)</div>
+                                    ${fields.map(field => `
+                                        <div class="dropdown-option" onclick="selectField('${type}', '${header}', '${field.api_name}')" data-api="${field.api_name}" data-type="${field.type}">
+                                            <span class="dropdown-column field-name">${field.display_name}</span>
+                                            <span class="dropdown-column api-name">${field.api_name}</span>
+                                            <span class="dropdown-column data-type">${field.type}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                        <span class="mapping-status-icon">${isMapped ? '✅' : ''}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function toggleDropdown(type, header) {
+            const dropdown = document.getElementById(`${type}_${header}_dropdown`);
+            const isOpen = dropdown.classList.contains('open');
+            document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
+
+            if (!isOpen) {
+                dropdown.classList.add('open');
+                const dropdownTrigger = dropdown.querySelector('.dropdown-trigger');
+                const dropdownList = dropdown.querySelector('.dropdown-list');
+
+                dropdownList.style.top = 'auto';
+                dropdownList.style.bottom = 'auto';
+
+                const triggerRect = dropdownTrigger.getBoundingClientRect();
+                const listHeight = dropdownList.offsetHeight;
+                const viewportHeight = window.innerHeight;
+                const spaceBelow = viewportHeight - triggerRect.bottom;
+                const spaceAbove = triggerRect.top;
+
+                if (spaceBelow >= listHeight || spaceBelow >= spaceAbove) {
+                    dropdownList.style.top = '100%';
+                    dropdownList.style.bottom = 'auto';
+                } else {
+                    dropdownList.style.top = 'auto';
+                    dropdownList.style.bottom = '100%';
+                }
+
+                // Auto-scroll to make a few rows visible
+                setTimeout(() => {
+                    const firstFewRows = dropdownList.querySelectorAll('.dropdown-option')[2]; // Target the third option
+                    if (firstFewRows) {
+                        firstFewRows.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }, 0);
+            }
+        }
+
+        function filterDropdown(type, header, searchTerm) {
+            const dropdown = document.getElementById(`${type}_${header}_dropdown`);
+            const options = dropdown.querySelectorAll('.dropdown-option');
+            const fields = commentZendeskFields.map(field => ({
+                api_name: field,
+                display_name: field.replace('_', ' ').title(),
+                type: field === 'public' ? 'boolean' : (field === 'created_at' ? 'date' : 'text')
+            }));
+
+            options.forEach(option => {
+                const apiName = option.getAttribute('data-api') || '';
+                let shouldShow = false;
+
+                if (!apiName) {
+                    shouldShow = "(none)".includes(searchTerm.toLowerCase());
+                } else {
+                    const field = fields.find(f => f.api_name === apiName);
+                    if (field) {
+                        const text = `${field.display_name} ${field.api_name} ${field.type}`.toLowerCase();
+                        shouldShow = text.includes(searchTerm.toLowerCase());
+                    }
+                }
+
+                option.style.display = shouldShow ? 'block' : 'none';
+            });
+        }
+
+        function selectField(type, header, apiName) {
+            commentFieldMapping[header] = apiName;
+            populateMapping(type);
+        }
+
+        async function autoMapFields(type) {
+            const response = await window.pywebview.api.auto_map_fields(commentsCsvHeaders, type);
+            if (response.success) {
+                commentFieldMapping = response.mapping;
+                populateMapping(type);
+            } else {
+                alert('Failed to auto-map fields: ' + response.message);
+            }
+        }
+
+        async function saveMapping(type) {
+            const fileResponse = await window.pywebview.api.select_save_file('comment_mapping.json');
+            if (fileResponse.success) {
+                const saveResponse = await window.pywebview.api.save_mapping_to_file(commentFieldMapping, fileResponse.file_path, type);
+                if (saveResponse.success) alert('Mapping saved!');
+                else alert('Failed to save mapping: ' + saveResponse.message);
+            } else {
+                alert('Failed to select file: ' + fileResponse.message);
+            }
+        }
+
+        async function loadMapping(type) {
+            const fileResponse = await window.pywebview.api.select_mapping_file();
+            if (fileResponse.success) {
+                const loadResponse = await window.pywebview.api.load_mapping_from_file(fileResponse.file_path, type);
+                if (loadResponse.success) {
+                    commentFieldMapping = loadResponse.mapping;
+                    populateMapping(type);
+                    alert('Mapping loaded!');
+                } else {
+                    alert('Failed to load mapping: ' + loadResponse.message);
+                }
+            }
+        }
+
+        async function nextPage() {
+            await window.pywebview.api.set_field_mapping(commentFieldMapping, 'comment');
+            const selectedObject = (await window.pywebview.api.get_selected_object()).selected_object;
+            if (selectedObject === "Tickets + Comments + Attachments") {
+                window.pywebview.api.navigate_to('attachment_mapping');
+            } else {
+                window.pywebview.api.navigate_to('confirm_import');
+            }
+        }
+
+        function goBack() {
+            window.pywebview.api.navigate_to('ticket_field_mapping');
+        }
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.custom-dropdown')) {
+                document.querySelectorAll('.custom-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Operation - Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="confirm-operation">
+    <div class="container">
+        <h2 id="dynamic-heading" class="text-center">Confirm Operation</h2>
+        
+        <div class="progress-section">
+            <progress id="progress-bar" value="0" max="100" class="visible"></progress>
+            <p id="progress-estimate-note" class="text-center hidden">
+                *Export in progress. Please wait while we filter out deleted records.
+            </p>
+        </div>
+
+        <div class="form-group save-dir-section">
+            <button id="choose-save-btn" class="secondary-button" onclick="chooseSaveLocation()">Choose Save Directory</button>
+            <p id="save-dir-display" class="text-center">No location selected</p>
+        </div>
+
+        <div id="attachment-dir-section" class="form-group hidden">
+            <button id="choose-attachment-dir-btn" class="secondary-button" onclick="chooseAttachmentDirectory()">Choose Attachment Directory</button>
+            <p id="attachment-dir-display" class="text-center">No directory selected</p>
+        </div>
+
+        <div id="ticket-id-section" class="form-group hidden">
+            <h3 id="ticket-id-heading" class="text-center"></h3>
+            <div class="ticket-id-row">
+                <div class="ticket-id-item">
+                    <label for="ticket_id_field">Ticket ID (Ticket CSV)</label>
+                    <select id="ticket_id_field"></select>
+                </div>
+                <div class="ticket-id-item">
+                    <label for="comment_ticket_id_field">Ticket ID (Comment CSV)</label>
+                    <select id="comment_ticket_id_field"></select>
+                </div>
+                <div class="ticket-id-item" id="attachment-comment-id-section">
+                    <label for="attachment_comment_id_field">Comment ID (Comment CSV)</label>
+                    <select id="attachment_comment_id_field"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group-vertical">
+            <button id="start-button" class="action-button primary-button" onclick="startImport()">Start Operation</button>
+            <button id="stop-button" class="action-button" onclick="stopOperation()" disabled>Stop</button>
+            <button id="back-button" class="nav-button" onclick="goBack()">Back</button>
+        </div>
+
+        <p class="footer-text">Need assistance? <a href="https://support.zendesk.com" target="_blank">Contact Zendesk Support</a></p>
+    </div>
+
+    <script>
+        // Initialize pywebview to prevent undefined errors
+        if (!window.pywebview) {
+            window.pywebview = {};
+        }
+        if (!window.pywebview._returnValues) {
+            window.pywebview._returnValues = {};
+        }
+
+        let operationRunning = false;
+        let csvHeaders = [];
+        let commentsCsvHeaders = [];
+        let actionType = '';
+        let isTicketsAndComments = false;
+        let isTicketsCommentsAttachments = false;
+        let isAttachmentsOnly = false;
+
+        window.addEventListener('pywebviewready', async () => {
+            console.log('pywebviewready fired for confirm_import.html');
+            try {
+                const selectedObjectResponse = await window.pywebview.api.get_selected_object();
+                const actionResponse = await window.pywebview.api.get_action_type();
+                console.log('Selected object:', selectedObjectResponse);
+                console.log('Action type:', actionResponse);
+                const selectedObject = selectedObjectResponse.selected_object;
+                actionType = actionResponse.action_type.toLowerCase();
+
+                // Update dynamic heading
+                document.getElementById('dynamic-heading').textContent = `Confirm ${actionType.charAt(0).toUpperCase() + actionType.slice(1)}`;
+
+                if (actionType === "export") {
+                    document.getElementById('progress-estimate-note').classList.remove("hidden");
+                }
+
+                document.getElementById('choose-save-btn').textContent = ['export', 'import', 'update', 'delete'].includes(actionType) ? 'Choose Save Directory' : 'Choose Save File';
+
+                // Determine object type and configure UI
+                isTicketsAndComments = selectedObject === "Tickets + Comments";
+                isTicketsCommentsAttachments = selectedObject === "Tickets + Comments + Attachments";
+                isAttachmentsOnly = selectedObject === "Attachments";
+
+                if (isTicketsAndComments || isTicketsCommentsAttachments) {
+                    const ticketSection = document.getElementById('ticket-id-section');
+                    const ticketHeading = document.getElementById('ticket-id-heading');
+                    ticketSection.classList.remove("hidden");
+
+                    if (isTicketsCommentsAttachments) {
+                        ticketHeading.textContent = "🔗 Link Tickets, Comments, and Attachments";
+                        document.getElementById('attachment-comment-id-section').classList.remove("hidden");
+                        document.getElementById('attachment-dir-section').classList.remove("hidden");
+                    } else {
+                        ticketHeading.textContent = "🔗 Link Tickets and Comments";
+                    }
+
+                    const csvData = await window.pywebview.api.get_csv_data();
+                    csvHeaders = csvData.headers || [];
+                    commentsCsvHeaders = csvData.comments_headers || [];
+                    populateTicketIdFields();
+                }
+
+                if (isAttachmentsOnly) {
+                    document.getElementById('attachment-dir-section').classList.remove("hidden");
+                }
+
+                // Ensure progress bar is visible
+                document.getElementById("progress-bar").classList.add("visible");
+            } catch (error) {
+                console.error('Error initializing page:', error);
+                alert(`Error initializing page: ${error}`);
+            }
+        });
+
+        async function chooseSaveLocation() {
+            try {
+                let response;
+                if (['export', 'import', 'update', 'delete'].includes(actionType)) {
+                    response = await window.pywebview.api.select_save_directory();
+                    if (response.success) {
+                        document.getElementById("save-dir-display").textContent = `Save to: ${response.directory}`;
+                    }
+                } else {
+                    response = await window.pywebview.api.select_save_file(`${actionType}_output.csv`);
+                    if (response.success) {
+                        document.getElementById("save-dir-display").textContent = `Save to: ${response.file_path}`;
+                    }
+                }
+                if (!response.success) {
+                    alert(`Failed to select location: ${response.message}`);
+                }
+            } catch (error) {
+                console.error("Error selecting save location:", error);
+                alert(`Error selecting save location: ${error}`);
+            }
+        }
+
+        async function chooseAttachmentDirectory() {
+            try {
+                const response = await window.pywebview.api.select_attachment_directory();
+                if (response.success) {
+                    document.getElementById("attachment-dir-display").textContent = `Directory: ${response.directory}`;
+                } else {
+                    alert(`Failed to select directory: ${response.message}`);
+                }
+            } catch (error) {
+                console.error("Error selecting attachment directory:", error);
+                alert(`Error selecting attachment directory: ${error}`);
+            }
+        }
+
+        function populateTicketIdFields() {
+            const ticketIdSelect = document.getElementById('ticket_id_field');
+            const commentIdSelect = document.getElementById('comment_ticket_id_field');
+            const attachmentCommentIdSelect = document.getElementById('attachment_comment_id_field');
+
+            ticketIdSelect.innerHTML = '<option value="">Select Ticket ID</option>' + 
+                csvHeaders.map(header => `<option value="${header}">${header}</option>`).join('');
+            commentIdSelect.innerHTML = '<option value="">Select Ticket ID</option>' + 
+                commentsCsvHeaders.map(header => `<option value="${header}">${header}</option>`).join('');
+            if (isTicketsCommentsAttachments) {
+                attachmentCommentIdSelect.innerHTML = '<option value="">Select Comment ID</option>' + 
+                    commentsCsvHeaders.map(header => `<option value="${header}">${header}</option>`).join('');
+            }
+        }
+
+        async function startImport() {
+            console.log('🚀 Starting startImport');
+            if (operationRunning) {
+                console.warn('⚠️ Operation already in progress');
+                alert("Operation already in progress.");
+                return;
+            }
+
+            const saveDirDisplay = document.getElementById("save-dir-display").textContent;
+            console.log(`📂 Save directory: ${saveDirDisplay}`);
+            if (saveDirDisplay === "No location selected") {
+                console.warn('❌ No save location selected');
+                alert("Please choose a save location before starting the operation.");
+                return;
+            }
+
+            if (isTicketsCommentsAttachments || isAttachmentsOnly) {
+                const attachmentDirDisplay = document.getElementById("attachment-dir-display").textContent;
+                console.log(`📎 Attachment directory: ${attachmentDirDisplay}`);
+                if (attachmentDirDisplay === "No directory selected") {
+                    console.warn('❌ No attachment directory selected');
+                    alert("Please choose an attachment directory before starting the operation.");
+                    return;
+                }
+            }
+
+            try {
+                const selectedObjectResponse = await window.pywebview.api.get_selected_object();
+                const selectedObject = selectedObjectResponse.selected_object;
+                console.log(`🛠️ Selected object: ${selectedObject}, Action type: ${actionType}`);
+
+                if (isTicketsAndComments || isTicketsCommentsAttachments) {
+                    const ticketIdField = document.getElementById('ticket_id_field').value;
+                    const commentIdField = document.getElementById('comment_ticket_id_field').value;
+                    const attachmentCommentIdField = isTicketsCommentsAttachments ? document.getElementById('attachment_comment_id_field').value : null;
+                    console.log(`🔗 Ticket ID field: ${ticketIdField}, Comment ID field: ${commentIdField}, Attachment Comment ID: ${attachmentCommentIdField}`);
+
+                    if (!ticketIdField || !commentIdField) {
+                        console.warn('❌ Missing Ticket ID or Comment ID fields');
+                        alert("Please select Ticket ID fields for Tickets and Comments.");
+                        return;
+                    }
+
+                    if (isTicketsCommentsAttachments && !attachmentCommentIdField) {
+                        console.warn('❌ Missing Comment ID for Attachments');
+                        alert("Please select Comment ID for Attachments.");
+                        return;
+                    }
+
+                    if (actionType === 'import') {
+                        console.log('📋 Validating comment field mappings');
+                        const commentMappingResponse = await window.pywebview.api.get_field_mapping('comment');
+                        if (!commentMappingResponse.success) {
+                            console.warn('❌ Failed to retrieve comment field mappings');
+                            alert("Failed to retrieve comment field mappings.");
+                            return;
+                        }
+                        const mappedCommentFields = Object.values(commentMappingResponse.mapping);
+                        const hasBodyOrHtmlBody = ['body', 'html_body'].some(field => mappedCommentFields.includes(field));
+                        if (!hasBodyOrHtmlBody) {
+                            console.warn('❌ Missing required comment fields: Body or HTML Body');
+                            alert("Please map at least one of the required comment fields: Body, HTML Body");
+                            return;
+                        }
+
+                        if (isTicketsCommentsAttachments) {
+                            console.log('📋 Validating attachment field mappings');
+                            const attachmentMappingResponse = await window.pywebview.api.get_field_mapping('attachment');
+                            if (!attachmentMappingResponse.success) {
+                                console.warn('❌ Failed to retrieve attachment field mappings');
+                                alert("Failed to retrieve attachment field mappings.");
+                                return;
+                            }
+                            const requiredAttachmentFields = ['file_name'];
+                            const missingAttachmentFields = requiredAttachmentFields.filter(field => !Object.values(attachmentMappingResponse.mapping).includes(field));
+                            if (missingAttachmentFields.length > 0) {
+                                console.warn(`❌ Missing required attachment fields: ${missingAttachmentFields.join(', ')}`);
+                                alert(`Please map the following required attachment fields: ${missingAttachmentFields.join(', ')}`);
+                                return;
+                            }
+                        }
+
+                        console.log('📡 Setting ticket ID fields');
+                        await window.pywebview.api.set_ticket_id_fields(ticketIdField, commentIdField, attachmentCommentIdField);
+                    }
+                }
+
+                console.log('🔄 Locking UI and starting operation');
+                lockUi();
+                operationRunning = true;
+                try {
+                    console.log('📡 Calling execute_import');
+                    const progressBar = document.getElementById("progress-bar");
+                    progressBar.classList.add("visible");
+                    const response = await window.pywebview.api.execute_import();
+                    console.log(`📥 execute_import response:`, response);
+                    if (response.success) {
+                        console.log('✅ Operation completed successfully:', response.message);
+                        alert(response.message);
+                    } else {
+                        console.warn('❌ Operation failed:', response.message);
+                        alert(`Operation failed:\n${response.message}`);
+                    }
+                } catch (error) {
+                    console.error('❌ Error starting operation:', error);
+                    alert(`Error starting operation: ${error}`);
+                } finally {
+                    console.log('🔄 Unlocking UI');
+                    operationRunning = false;
+                    unlockUi();
+                    document.getElementById("progress-bar").classList.add("visible");
+                }
+            } catch (error) {
+                console.error('❌ Error validating field mappings:', error);
+                alert(`Error validating field mappings: ${error}`);
+            }
+        }
+
+        async function stopOperation() {
+            if (!operationRunning) {
+                alert("No operation is currently running.");
+                return;
+            }
+
+            try {
+                const response = await window.pywebview.api.stop_operation();
+                if (response.success) {
+                    document.getElementById("stop-button").disabled = true;
+                    alert('Operation stop requested.');
+                } else {
+                    alert(`Failed to stop: ${response.message}`);
+                }
+            } catch (error) {
+                console.error('Error stopping operation:', error);
+                alert(`Error stopping operation: ${error}`);
+            }
+        }
+
+        function goBack() {
+            if (actionType === 'export') {
+                window.pywebview.api.navigate_to('object_selection').then(response => {
+                    console.log('Navigated back to object_selection', response);
+                }).catch(error => {
+                    console.error('Error navigating back:', error);
+                    alert(`Error navigating back: ${error}`);
+                });
+            } else {
+                const targetPage = isTicketsAndComments ? 'comment_mapping' : (isTicketsCommentsAttachments ? 'field_mapping' : 'field_mapping');
+                window.pywebview.api.navigate_to(targetPage).then(response => {
+                    console.log(`Navigated back to: ${targetPage}`, response);
+                }).catch(error => {
+                    console.error('Error navigating back:', error);
+                    alert(`Error navigating back: ${error}`);
+                });
+            }
+        }
+
+        function lockUi() {
+            document.getElementById("start-button").disabled = true;
+            document.getElementById("stop-button").disabled = false;
+            document.getElementById("choose-save-btn").disabled = true;
+            document.getElementById("back-button").disabled = true;
+            if (isTicketsAndComments || isTicketsCommentsAttachments) {
+                document.getElementById("ticket_id_field").disabled = true;
+                document.getElementById("comment_ticket_id_field").disabled = true;
+                if (isTicketsCommentsAttachments) {
+                    document.getElementById("attachment_comment_id_field").disabled = true;
+                }
+            }
+            if (isTicketsCommentsAttachments || isAttachmentsOnly) {
+                document.getElementById("choose-attachment-dir-btn").disabled = true;
+            }
+            document.getElementById("progress-bar").classList.add("visible");
+        }
+
+        function unlockUi() {
+            document.getElementById("start-button").disabled = false;
+            document.getElementById("stop-button").disabled = true;
+            document.getElementById("choose-save-btn").disabled = false;
+            document.getElementById("back-button").disabled = false;
+            if (isTicketsAndComments || isTicketsCommentsAttachments) {
+                document.getElementById("ticket_id_field").disabled = false;
+                document.getElementById("comment_ticket_id_field").disabled = false;
+                if (isTicketsCommentsAttachments) {
+                    document.getElementById("attachment_comment_id_field").disabled = false;
+                }
+            }
+            if (isTicketsCommentsAttachments || isAttachmentsOnly) {
+                document.getElementById("choose-attachment-dir-btn").disabled = false;
+            }
+            document.getElementById("progress-bar").classList.add("visible");
+        }
+
+        function updateProgressBar(progress, recordCount = null) {
+            const cappedProgress = Math.min(progress, 100);
+            const progressBar = document.getElementById("progress-bar");
+            progressBar.value = cappedProgress;
+            progressBar.classList.add("visible");
+        }
+
+        window.updateProgressBar = updateProgressBar;
+    </script>
+
+</body>
+</html>

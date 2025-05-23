@@ -1,0 +1,706 @@
+/* Reset default styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    overflow-y: hidden;
+}
+
+body {
+    font-family: 'Inter', 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+    background-color: #f7f8fa; /* Zendesk Light Grey */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Unified Container */
+.container {
+    width: 100%;
+    min-height: 100vh;
+    padding: 24px;
+    background: linear-gradient(135deg, #f7f8fa 0%, #ebedef 100%); /* Zendesk Light Grey to slightly darker grey */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+}
+
+/* Typography */
+h1, h2, h3 {
+    font-weight: 600;
+    color: #1f2a44; /* Zendesk Dark Grey */
+    text-align: center;
+}
+
+h1 {
+    font-size: 1.75rem;
+    margin-bottom: 24px;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 12px;
+}
+
+h3 {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+}
+
+/* Buttons */
+button {
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background-color: #03363d; /* Specified Primary Color */
+    color: #ffffff; /* White */
+    transition: background-color 0.2s ease, transform 0.2s ease;
+    margin: 8px 0;
+}
+
+button:hover:not(:disabled) {
+    background-color: #024a54; /* Lighter variant for hover */
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+button:disabled {
+    background-color: #ebedef; /* Zendesk Light Grey */
+    color: #6b7280; /* Zendesk Medium Grey */
+    cursor: not-allowed;
+}
+
+.action-button {
+    width: 200px;
+    padding: 12px 16px;
+    font-size: 1rem;
+}
+
+.nav-button {
+    background-color: #6b7280; /* Zendesk Medium Grey */
+    width: 120px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+}
+
+.nav-button:hover:not(:disabled) {
+    background-color: #4b5563; /* Darker Medium Grey */
+}
+
+.login-button {
+    width: 200px;
+    padding: 12px 16px;
+    font-size: 1rem;
+}
+
+.secondary-button {
+    background-color: #6b7280; /* Zendesk Medium Grey */
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    width: auto;
+    border: none;
+    border-radius: 6px;
+    color: #ffffff; /* White */
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.secondary-button:hover:not(:disabled) {
+    background-color: #4b5563; /* Darker Medium Grey */
+}
+
+#choose-attachment-dir-btn.secondary-button,
+#choose-save-btn.secondary-button {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    border-radius: 6px;
+    background-color: #ffffff; /* White */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    width: auto;
+    max-width: 200px;
+    font-family: 'Inter', 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+    font-weight: 400;
+}
+
+#choose-attachment-dir-btn.secondary-button:hover:not(:disabled),
+#choose-save-btn.secondary-button:hover:not(:disabled) {
+    background-color: #f7f8fa; /* Zendesk Light Grey */
+    border-color: #03363d; /* Specified Primary Color */
+}
+
+.primary-button {
+    background-color: #03363d; /* Specified Primary Color */
+}
+
+.primary-button:hover:not(:disabled) {
+    background-color: #024a54; /* Lighter variant for hover */
+}
+
+/* Button Groups */
+.button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin: 16px 0;
+    width: 100%;
+    max-width: 600px;
+}
+
+.button-group-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+    width: 100%;
+    max-width: 600px;
+}
+
+.field-mapping-nav-horizontal {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 16px 0;
+    width: 100%;
+    max-width: 600px;
+}
+
+.back-button-container {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+    width: 100%;
+    max-width: 600px;
+}
+
+/* Form and Inputs */
+.form-group {
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 600px;
+}
+
+label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    color: #1f2a44; /* Zendesk Dark Grey */
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: #ffffff; /* White */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    transition: border-color 0.2s ease;
+}
+
+input[type="file"] {
+    width: auto;
+    padding: 6px;
+    font-size: 0.8rem;
+    max-width: 200px;
+    background: transparent;
+    border: none;
+    color: #1f2a44; /* Zendesk Dark Grey */
+}
+
+input:focus,
+select:focus {
+    border-color: #1749a4; /* Zendesk Blue */
+    outline: none;
+}
+
+#actionSelect,
+#objectSelect {
+    width: 200px;
+}
+
+#subdomain,
+#email,
+#api_token {
+    width: 100%;
+}
+
+/* Checkbox */
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin-top: 12px;
+}
+
+input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Mapping List */
+.mapping-list {
+    width: 100%;
+    max-width: 600px;
+    background: transparent;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: auto;
+    min-height: 150px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 2px 0;
+    position: relative;
+}
+
+#field-mapping .mapping-list,
+#ticket-field-mapping .mapping-list,
+#ticket-comment-mapping .mapping-list {
+    max-width: 100%;
+}
+
+/* Mapping Row */
+.mapping-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+    border-radius: 6px;
+    width: 100%;
+    height: 20px;
+    margin: 4px 0;
+}
+
+/* Mapping Content */
+.mapping-content {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    max-width: 480px;
+    gap: 10px;
+    padding: 0 4px;
+    height: 100%;
+    position: relative;
+    margin-left: -50px;
+}
+
+.csv-header-label {
+    font-weight: 500;
+    font-size: 0.65rem;
+    color: #1f2a44; /* Zendesk Dark Grey */
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    height: 20px;
+    line-height: 20px;
+    margin-right: 0px;
+    padding-top: 3px;
+}
+
+.csv-header-label .required {
+    color: #eb4d4b; /* Zendesk Red */
+    margin-left: 4px;
+}
+
+.mapping-status-icon {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Adjust margin when tabs are hidden */
+.tabs:empty {
+    margin-bottom: 0;
+}
+
+/* Custom Dropdown */
+.custom-dropdown {
+    position: relative;
+    width: 360px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 360px;
+}
+
+#field-mapping .custom-dropdown,
+#ticket-field-mapping .custom-dropdown,
+#ticket-comment-mapping .custom-dropdown {
+    width: 360px;
+}
+
+/* Dropdown Trigger */
+.dropdown-trigger {
+    padding: 0 6px;
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    border-radius: 6px;
+    background-color: #f7f8fa; /* Zendesk Light Grey */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 20px;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    position: relative;
+}
+
+.dropdown-trigger:focus,
+.dropdown-trigger.active {
+    border-color: #1749a4; /* Zendesk Blue */
+    background-color: #e6f0fa; /* Light Blue for focus */
+    outline: none;
+}
+
+.dropdown-trigger::after {
+    content: '▼';
+    font-size: 10px;
+    color: #1749a4; /* Zendesk Blue */
+    margin-left: 6px;
+    line-height: 1;
+    display: inline-block;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Dropdown Text */
+.dropdown-text {
+    flex-grow: 1;
+    font-size: 0.65rem;
+    color: #1f2a44; /* Zendesk Dark Grey */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    line-height: 1;
+}
+
+/* Dropdown List */
+.dropdown-list {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    background-color: #ffffff; /* White */
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-height: 150px;
+    overflow-y: auto;
+    min-width: 100%;
+}
+
+.custom-dropdown.open .dropdown-list {
+    display: block;
+}
+
+.dropdown-search {
+    width: 100%;
+    padding: 1px;
+    border: none;
+    border-bottom: 1px solid #ebedef; /* Zendesk Light Grey */
+    font-size: 0.7rem;
+    line-height: 1;
+    height: 18px;
+    box-sizing: border-box;
+}
+
+/* Dropdown Header */
+.dropdown-header {
+    display: flex;
+    align-items: center;
+    padding: 3px 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #1f2a44; /* Zendesk Dark Grey */
+    background-color: #f7f8fa; /* Zendesk Light Grey */
+    border-bottom: 1px solid #ebedef; /* Zendesk Light Grey */
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.dropdown-header .dropdown-column {
+    padding: 0 4px;
+}
+
+.dropdown-options {
+    padding: 4px 0;
+}
+
+.dropdown-option {
+    padding: 3px 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    height: 20px;
+}
+
+.dropdown-option:hover {
+    background-color: #e6f0fa; /* Light Blue for hover */
+}
+
+.dropdown-column {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
+}
+
+.dropdown-column.field-name {
+    flex: 2;
+    min-width: 140px;
+}
+
+.dropdown-column.api-name {
+    flex: 1.5;
+    min-width: 120px;
+}
+
+.dropdown-column.data-type {
+    flex: 1;
+    min-width: 100px;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.tab-button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    border: none;
+    background-color: #ebedef; /* Zendesk Light Grey */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    margin: 0 4px;
+    transition: background-color 0.2s ease;
+}
+
+.tab-button.active {
+    background-color: #03363d; /* Specified Primary Color */
+    color: #ffffff; /* White */
+}
+
+.tab-button:hover:not(.active) {
+    background-color: #d1d5db; /* Slightly darker grey */
+}
+
+.tab-content {
+    width: 100%;
+    max-width: 600px;
+}
+
+/* Mapping Header */
+.mapping-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.mapping-status {
+    font-size: 0.9rem;
+    color: #6b7280; /* Zendesk Medium Grey */
+}
+
+/* Progress Section */
+.progress-section {
+    width: 100%;
+    max-width: 600px;
+    margin: 20px 0;
+}
+
+/* Progress Bar */
+progress {
+    width: 100%;
+    height: 24px;
+    margin: 20px 0;
+    border-radius: 12px;
+    background-color: #ebedef; /* Zendesk Light Grey */
+    border: none;
+    display: block;
+}
+
+progress::-webkit-progress-value {
+    background-color: #03363d; /* Specified Primary Color */
+    border-radius: 12px;
+}
+
+progress::-moz-progress-bar {
+    background-color: #03363d; /* Specified Primary Color */
+    border-radius: 12px;
+}
+
+progress.visible {
+    display: block !important;
+}
+
+/* Sections */
+#ticket-mapping-section,
+#comment-mapping-section,
+#attachment-mapping-section {
+    margin: 8px 0;
+    padding: 16px;
+    background: transparent;
+    border-radius: 8px;
+    border: none;
+    width: 100%;
+    max-width: 600px;
+}
+
+#ticket-id-section {
+    margin: 4px 0;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.8); /* Semi-transparent white */
+    border-radius: 8px;
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    width: 100%;
+    max-width: 600px;
+}
+
+#ticket-id-section h3 {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.ticket-id-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.ticket-id-item {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+#ticket-id-section label {
+    font-weight: 500;
+    font-size: 0.75rem;
+    margin-bottom: 2px;
+}
+
+#ticket-id-section select {
+    width: 100%;
+    padding: 4px;
+    margin-bottom: 0;
+    border: 1px solid #ebedef; /* Zendesk Light Grey */
+    border-radius: 6px;
+    font-size: 0.75rem;
+    background-color: #ffffff; /* White */
+    color: #1f2a44; /* Zendesk Dark Grey */
+    transition: border-color 0.2s ease;
+}
+
+/* Text and Utility */
+p {
+    margin: 12px 0;
+    color: #6b7280; /* Zendesk Medium Grey */
+}
+
+.text-center {
+    text-align: center;
+}
+
+.save-dir-section {
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 600px;
+}
+
+#save-dir-display {
+    font-size: 0.9rem;
+    color: #6b7280; /* Zendesk Medium Grey */
+}
+
+.hidden {
+    display: none;
+}
+
+.upload-section {
+    margin: 0 0 1px 0;
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Footer Text */
+.footer-text {
+    font-size: 0.85rem;
+    color: #6b7280; /* Zendesk Medium Grey */
+    margin-top: 20px;
+    text-align: center;
+    width: 100%;
+    max-width: 600px;
+}
+
+.footer-text a {
+    color: #1749a4; /* Zendesk Blue */
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.footer-text a:hover {
+    text-decoration: underline;
+}

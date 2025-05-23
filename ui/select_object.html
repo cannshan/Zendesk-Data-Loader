@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zendesk Data Loader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body id="object-selection">
+    <div class="container">
+        <div class="header-section">
+            <h1 class="app-title">Zendesk Data Loader</h1>
+        </div>
+        <div class="action-form">
+            <div class="form-group">
+                <select id="objectSelect">
+                    <option value="" disabled selected>Select an object</option>
+                    <option value="Organization">Organizations</option>
+                    <option value="User">End Users</option>
+                    <option value="Agent">Agents</option>
+                    <option value="Ticket">Tickets</option>
+                    <option value="Tickets + Comments" id="ticketsCommentsOption">Tickets + Comments</option>
+                    <option value="Attachments" id="attachmentsOption">Attachments</option>
+                    <option value="Tickets + Comments + Attachments" id="ticketsCommentsAttachmentsOption">Tickets + Comments + Attachments</option>
+                    <option value="Comments" id="commentsOption">Comments</option>
+                    <option value="Trigger">Triggers</option>
+                    <option value="Macros">Macros</option>
+                    <!-- Custom objects will be appended dynamically -->
+                </select>
+            </div>
+            <div class="button-group">
+                <button class="action-button" onclick="selectObject(document.getElementById('objectSelect').value)">Continue</button>
+            </div>
+            <div class="back-button-container">
+                <button class="nav-button" onclick="goBack()">Back</button>
+            </div>
+        </div>
+        <p class="footer-text">Need assistance? <a href="https://support.zendesk.com" target="_blank">Contact Zendesk Support</a></p>
+    </div>
+
+    <script>
+        let actionType = '';
+
+        window.addEventListener('pywebviewready', async () => {
+            try {
+                const action = await window.pywebview.api.get_action_type();
+                actionType = action.action_type.toLowerCase();
+                console.log('actionType:', actionType); // For debugging
+
+                // Get option elements
+                const selectElement = document.getElementById("objectSelect");
+                const ticketsCommentsOption = document.getElementById("ticketsCommentsOption");
+                const commentsOption = document.getElementById("commentsOption");
+                const attachmentsOption = document.getElementById("attachmentsOption");
+                const ticketsCommentsAttachmentsOption = document.getElementById("ticketsCommentsAttachmentsOption");
+
+                // Update Attachments display text based on actionType
+                if (actionType === 'export') {
+                    // Remove Tickets + Comments and Tickets + Comments + Attachments
+                    if (ticketsCommentsOption) ticketsCommentsOption.remove();
+                    if (ticketsCommentsAttachmentsOption) ticketsCommentsAttachmentsOption.remove();
+                    // Show Comments and rename Attachments to Comments + Attachments
+                    if (commentsOption) commentsOption.style.display = 'block';
+                    if (attachmentsOption) {
+                        attachmentsOption.textContent = 'Comments + Attachments';
+                        attachmentsOption.style.display = 'block';
+                    }
+                } else if (actionType === 'import') {
+                    // Show all relevant options, keep Attachments as is
+                    if (ticketsCommentsOption) ticketsCommentsOption.style.display = 'block';
+                    if (ticketsCommentsAttachmentsOption) ticketsCommentsAttachmentsOption.style.display = 'block';
+                    if (attachmentsOption) {
+                        attachmentsOption.textContent = 'Attachments'; // Ensure original name
+                        attachmentsOption.style.display = 'block';
+                    }
+                    if (commentsOption) commentsOption.style.display = 'none';
+                } else {
+                    // Show all options for other actions (e.g., update, delete)
+                    if (ticketsCommentsOption) ticketsCommentsOption.style.display = 'block';
+                    if (ticketsCommentsAttachmentsOption) ticketsCommentsAttachmentsOption.style.display = 'block';
+                    if (commentsOption) commentsOption.style.display = 'block';
+                    if (attachmentsOption) {
+                        attachmentsOption.textContent = 'Attachments'; // Ensure original name
+                        attachmentsOption.style.display = 'block';
+                    }
+                }
+
+                // Fetch and append custom objects
+                const customObjectsResponse = await window.pywebview.api.get_custom_objects();
+                if (customObjectsResponse.success && customObjectsResponse.custom_objects.length > 0) {
+                    customObjectsResponse.custom_objects.forEach(obj => {
+                        const option = document.createElement('option');
+                        option.value = obj;
+                        option.textContent = obj;
+                        selectElement.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching action type or custom objects:', error);
+                // Hide all conditional options in case of error
+                const ticketsCommentsOption = document.getElementById("ticketsCommentsOption");
+                const commentsOption = document.getElementById("commentsOption");
+                const attachmentsOption = document.getElementById("attachmentsOption");
+                const ticketsCommentsAttachmentsOption = document.getElementById("ticketsCommentsAttachmentsOption");
+                if (ticketsCommentsOption) ticketsCommentsOption.style.display = 'none';
+                if (commentsOption) commentsOption.style.display = 'none';
+                if (attachmentsOption) attachmentsOption.style.display = 'none';
+                if (ticketsCommentsAttachmentsOption) ticketsCommentsAttachmentsOption.style.display = 'none';
+            }
+        });
+
+        async function selectObject(object) {
+            if (object) {
+                try {
+                    await window.pywebview.api.set_selected_object(object);
+                    if (actionType === 'export') {
+                        window.pywebview.api.navigate_to('confirm_import');
+                    } else {
+                        window.pywebview.api.navigate_to('field_mapping');
+                    }
+                } catch (error) {
+                    console.error('Error selecting object:', error);
+                    alert('Error selecting object: ' + error);
+                }
+            } else {
+                alert('Please select an object to continue.');
+            }
+        }
+
+        function goBack() {
+            window.pywebview.api.navigate_to('action_selection');
+        }
+    </script>
+
+</body>
+</html>
